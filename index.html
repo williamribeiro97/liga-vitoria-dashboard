@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Liga Vitória — Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0d0f14;
+    color: #fff;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 48px;
+    background: #13161e;
+    border-bottom: 2px solid #1e2330;
+    flex-shrink: 0;
+  }
+  .logo {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #fff;
+  }
+  .logo span { color: #f5a623; }
+  .header-meta {
+    text-align: right;
+  }
+  .header-period {
+    font-size: 15px;
+    color: #8a90a0;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .header-clock {
+    font-size: 28px;
+    font-weight: 300;
+    color: #fff;
+    letter-spacing: 3px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* SLIDES */
+  .slides-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+  .slide {
+    position: absolute;
+    inset: 0;
+    padding: 36px 64px;
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+    pointer-events: none;
+  }
+  .slide.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .slide-title {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #8a90a0;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .slide-title::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 20px;
+    background: #f5a623;
+    border-radius: 2px;
+  }
+
+  /* CHART WRAPPER */
+  .chart-area {
+    flex: 1;
+    position: relative;
+    min-height: 0;
+  }
+
+  /* LEGEND */
+  .legend {
+    display: flex;
+    gap: 28px;
+    margin-bottom: 20px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #8a90a0;
+    letter-spacing: 0.5px;
+  }
+  .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+
+  /* PROGRESS INDICATOR */
+  .progress-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: #f5a623;
+    transition: width linear;
+    z-index: 100;
+  }
+
+  /* DOTS */
+  .dots {
+    position: fixed;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    z-index: 100;
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #2a2e3a;
+    transition: background 0.3s;
+  }
+  .dot.active { background: #f5a623; }
+
+  /* LAST UPDATE */
+  .last-update {
+    position: fixed;
+    bottom: 10px;
+    right: 20px;
+    font-size: 11px;
+    color: #3a3f50;
+    z-index: 100;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Liga <span>Vitória</span></div>
+  <div class="header-meta">
+    <div class="header-period" id="header-period">Meta — Maio 2026</div>
+    <div class="header-clock" id="clock">00:00:00</div>
+  </div>
+</header>
+
+<div class="slides-container">
+
+  <!-- SLIDE 1: COMERCIAL (por corretor) -->
+  <div class="slide active" id="slide-0">
+    <div class="slide-title">Comercial — Alcance por Corretor</div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div> Alcance %</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div> Meta faltante %</div>
+    </div>
+    <div class="chart-area">
+      <canvas id="chartCorretores" role="img" aria-label="Gráfico de alcance de meta por corretor"></canvas>
+    </div>
+  </div>
+
+  <!-- SLIDE 2: EQUIPE (por setor) -->
+  <div class="slide" id="slide-1">
+    <div class="slide-title">Meta Equipe — Alcance por Setor</div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div> Meta alcançada %</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div> Meta faltante %</div>
+    </div>
+    <div class="chart-area">
+      <canvas id="chartSetores" role="img" aria-label="Gráfico de alcance de meta por setor"></canvas>
+    </div>
+  </div>
+
+</div>
+
+<!-- INDICATORS -->
+<div class="progress-bar" id="progress-bar"></div>
+<div class="dots">
+  <div class="dot active" id="dot-0"></div>
+  <div class="dot" id="dot-1"></div>
+</div>
+<div class="last-update" id="last-update"></div>
+
+<script>
+// ============================================================
+// DADOS — editados via admin.html
+// ============================================================
+let dados = JSON.parse(localStorage.getItem('ligavitoria_dados') || 'null') || {
+  periodo: "Meta — Maio 2026",
+  corretores: [
+    { nome: "Hiago", alcance: 85.98 },
+    { nome: "José",  alcance: 3.59  }
+  ],
+  setores: [
+    { nome: "Corporate",        meta_valor: 345255.89, alcance: 83.88 },
+    { nome: "Varejo",           meta_valor: 87264.35,  alcance: 12.54 },
+    { nome: "Consórcio",        meta_valor: 44789.75,  alcance: 5.50  },
+    { nome: "Meta Consolidada", meta_valor: 477309.99, alcance: 67.13 }
+  ]
+};
+
+// ============================================================
+// CLOCK
+// ============================================================
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+document.getElementById('header-period').textContent = dados.periodo;
+
+// ============================================================
+// CHART OPTIONS BASE
+// ============================================================
+function makeStacked(canvas, labels, alcances, subtitles) {
+  const faltantes = alcances.map(v => Math.max(0, +(100 - v).toFixed(2)));
+
+  return new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Alcance %',
+          data: alcances,
+          backgroundColor: '#22c55e',
+          borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 6, bottomRight: 6 },
+          borderSkipped: false,
+          barThickness: 44,
+        },
+        {
+          label: 'Meta faltante %',
+          data: faltantes,
+          backgroundColor: '#ef4444',
+          borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 0, bottomRight: 0 },
+          borderSkipped: false,
+          barThickness: 44,
+        }
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.x.toFixed(2)}%`
+          }
+        },
+        datalabels: false
+      },
+      scales: {
+        x: {
+          stacked: true,
+          max: 100,
+          min: 0,
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: {
+            color: '#5a6070',
+            font: { size: 13 },
+            callback: v => v + '%'
+          },
+          border: { color: 'rgba(255,255,255,0.08)' }
+        },
+        y: {
+          stacked: true,
+          grid: { display: false },
+          ticks: {
+            color: '#c0c8da',
+            font: { size: 16, weight: '600' },
+            padding: 12,
+          },
+          border: { display: false }
+        }
+      },
+      layout: { padding: { right: 60 } },
+      animation: { duration: 600 }
+    },
+    plugins: [{
+      id: 'valueLabels',
+      afterDatasetsDraw(chart) {
+        const ctx = chart.ctx;
+        chart.data.datasets.forEach((dataset, di) => {
+          chart.getDatasetMeta(di).data.forEach((bar, i) => {
+            const val = dataset.data[i];
+            if (val < 2) return;
+            ctx.save();
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 15px Segoe UI, system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(val.toFixed(2) + '%', bar.x - (bar.width / 2), bar.y);
+            ctx.restore();
+          });
+        });
+      }
+    }]
+  });
+}
+
+// ============================================================
+// BUILD CHARTS
+// ============================================================
+function buildCharts() {
+  // Slide 1 — Corretores
+  const labelsC = dados.corretores.map(c => c.nome);
+  const alcancesC = dados.corretores.map(c => c.alcance);
+  if (window._chartC) window._chartC.destroy();
+  window._chartC = makeStacked(
+    document.getElementById('chartCorretores'),
+    labelsC, alcancesC
+  );
+
+  // Slide 2 — Setores
+  const labelsS = dados.setores.map(s =>
+    s.nome + (s.meta_valor ? `  (R$ ${s.meta_valor.toLocaleString('pt-BR', {minimumFractionDigits:2})})` : '')
+  );
+  const alcancesS = dados.setores.map(s => s.alcance);
+  if (window._chartS) window._chartS.destroy();
+  window._chartS = makeStacked(
+    document.getElementById('chartSetores'),
+    labelsS, alcancesS
+  );
+}
+
+buildCharts();
+
+// ============================================================
+// AUTO-ROTATE
+// ============================================================
+const INTERVAL = 12000; // 12 segundos por slide
+let current = 0;
+const total = 2;
+let startTime = Date.now();
+let timer;
+
+function showSlide(idx) {
+  document.querySelectorAll('.slide').forEach((s, i) => s.classList.toggle('active', i === idx));
+  document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === idx));
+  current = idx;
+  startTime = Date.now();
+}
+
+function animateProgress() {
+  const elapsed = Date.now() - startTime;
+  const pct = Math.min((elapsed / INTERVAL) * 100, 100);
+  document.getElementById('progress-bar').style.width = pct + '%';
+  requestAnimationFrame(animateProgress);
+}
+
+function next() {
+  showSlide((current + 1) % total);
+}
+
+timer = setInterval(next, INTERVAL);
+animateProgress();
+
+// ============================================================
+// LISTEN for admin updates (same tab or storage event)
+// ============================================================
+window.addEventListener('storage', e => {
+  if (e.key === 'ligavitoria_dados') {
+    dados = JSON.parse(e.newValue);
+    document.getElementById('header-period').textContent = dados.periodo;
+    buildCharts();
+    document.getElementById('last-update').textContent =
+      'Atualizado: ' + new Date().toLocaleTimeString('pt-BR');
+  }
+});
+
+// Also poll every 30s for same-device update
+setInterval(() => {
+  const fresh = JSON.parse(localStorage.getItem('ligavitoria_dados') || 'null');
+  if (fresh && JSON.stringify(fresh) !== JSON.stringify(dados)) {
+    dados = fresh;
+    document.getElementById('header-period').textContent = dados.periodo;
+    buildCharts();
+    document.getElementById('last-update').textContent =
+      'Atualizado: ' + new Date().toLocaleTimeString('pt-BR');
+  }
+}, 30000);
+</script>
+</body>
+</html>
