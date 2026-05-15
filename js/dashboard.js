@@ -29,30 +29,48 @@ function barHtml(pct, falt, big=false) {
   </div>`;
 }
 
-// ── Fetch ──
+// ── Fetch com fallback de proxies ──
+async function fetchCSV(url) {
+  // Tenta direto primeiro (funciona no Vercel/HTTPS)
+  try {
+    const r = await fetch(url + '&_t=' + Date.now(), { mode: 'cors' });
+    if (r.ok) { const t = await r.text(); if (t.length > 10) return t; }
+  } catch(e) {}
+
+  // Tenta cada proxy em sequência
+  for (const proxy of CONFIG.PROXIES) {
+    try {
+      const proxyUrl = proxy + encodeURIComponent(url + '&_t=' + Date.now());
+      const r = await fetch(proxyUrl);
+      if (r.ok) { const t = await r.text(); if (t.length > 10) return t; }
+    } catch(e) {}
+  }
+  throw new Error('Todos os proxies falharam');
+}
+
 async function fetchData() {
   try {
     document.getElementById('loading-text').textContent = 'Buscando dados...';
     document.getElementById('loading').classList.remove('hidden');
-    const p = CONFIG.PROXY;
-    const t = Date.now();
-    const [r1, r2] = await Promise.all([
-      fetch(p + encodeURIComponent(CONFIG.CSV_META      + '&_t=' + t)),
-      fetch(p + encodeURIComponent(CONFIG.CSV_COMERCIAL + '&_t=' + t)),
+
+    const [t1, t2] = await Promise.all([
+      fetchCSV(CONFIG.CSV_META),
+      fetchCSV(CONFIG.CSV_COMERCIAL),
     ]);
-    if (!r1.ok || !r2.ok) throw new Error('HTTP error');
-    const [t1, t2] = await Promise.all([r1.text(), r2.text()]);
+
     renderMeta(parseCSV(t1));
     renderComercial(parseCSV(t2));
     lastRefresh = Date.now();
     document.getElementById('loading').classList.add('hidden');
   } catch(e) {
-    console.error(e);
+    console.error('Fetch falhou:', e);
     const em = document.getElementById('error-msg');
     em.style.display = 'block';
-    em.textContent = 'Falha ao carregar. Tentando em ' + CONFIG.REFRESH_MIN + 'min...';
+    em.textContent = 'Falha ao carregar dados. Tentando novamente...';
     document.getElementById('loading-text').textContent = 'Erro de conexão';
-    setTimeout(() => document.getElementById('loading').classList.add('hidden'), 3000);
+    setTimeout(() => {
+      document.getElementById('loading').classList.add('hidden');
+    }, 3000);
   }
 }
 
